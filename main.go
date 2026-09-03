@@ -6,11 +6,19 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+
 )
 
 type Product struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
+}
+
+var products = []Product{
+	{ID: 1, Name: "Дрель"},
+	{ID: 2, Name: "Отвертка"},
+	{ID: 3, Name: "Молоток"},
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -19,24 +27,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func productsHandler(w http.ResponseWriter, r *http.Request) {
-
-	products := []Product{
-		{ID: 1, Name: "Дрель"},
-		{ID: 2, Name: "Отвертка"},
-		{ID: 3, Name: "Молоток"},
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(products)
 }
 
 func productHandler(w http.ResponseWriter, r *http.Request) {
-
-	products := []Product{
-		{ID: 1, Name: "Дрель"},
-		{ID: 2, Name: "Отвертка"},
-		{ID: 3, Name: "Молоток"},
-	}
 
 	url := r.URL.Path
 	content := strings.Split(url, "/")
@@ -55,12 +50,41 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+//	w.WriteHeader(http.StatusNotFound)
+	http.Error(w, "{\"error\" : \"Продукт не найден\"}", http.StatusNotFound)
+//	w.Write([]byte(`{"error": "Продукт не найден"}`))
+
+}
+
+func createProductHandler(w http.ResponseWriter, r *http.Request) {
+
+	var newProduct Product
+	err := json.NewDecoder(r.Body).Decode(&newProduct)
+
+	if( err != nil) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if( newProduct.Name == "") {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, "{\"error\" : \"Имя продукта не может быть пустым\"}", http.StatusBadRequest)
+		return
+	}
+
+	newProduct.ID = len(products) + 1
+	products = append(products, newProduct)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(newProduct)
+
 }
 
 func main() {
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/products", productsHandler)
-	http.HandleFunc("/product/{id}", productHandler)
+	http.HandleFunc("GET /health", healthHandler)
+	http.HandleFunc("GET /products", productsHandler)
+	http.HandleFunc("POST /products", createProductHandler)
+	http.HandleFunc("GET /product/{id}", productHandler)
 
 	fmt.Println("Сервер запущен на http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
